@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>eQ — collaborative drawing prototype</title>
+<style>
+  :root{
+    --paper:#f4efe3; --card:#fffdf7; --ink:#1a1a1a; --mute:#8a8473; --accent:#ff5a36;
+    --font:"Marker Felt","Chalkboard SE","Bradley Hand","Comic Sans MS",cursive;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:#2a2926;overflow:hidden;font-family:var(--font);color:var(--ink);
+    -webkit-user-select:none;user-select:none;touch-action:manipulation}
+  #stage{position:absolute;left:50%;top:50%;width:834px;height:1194px;background:var(--paper);
+    transform-origin:center center;overflow:hidden;border-radius:28px;box-shadow:0 20px 80px #0008}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;padding:56px 40px 48px}
+  .screen.on{display:flex}
+  h1,h2,h3,p{margin:0}
+  .logo{display:flex;align-items:center;gap:10px;font-size:44px;font-weight:700;letter-spacing:-1px}
+  .logo svg{width:60px;height:60px}
+  .btn{font-family:var(--font);font-size:34px;font-weight:700;padding:16px 44px;background:var(--card);color:var(--ink);
+    border:4px solid var(--ink);border-radius:60px;cursor:pointer;box-shadow:6px 6px 0 var(--ink);transition:transform .08s,box-shadow .08s}
+  .btn:active{transform:translate(4px,4px);box-shadow:2px 2px 0 var(--ink)}
+  .btn.primary{background:var(--accent)}
+  .btn.small{font-size:24px;padding:8px 24px;box-shadow:4px 4px 0 var(--ink)}
+  .btn[disabled]{opacity:.35;pointer-events:none}
+  .sp{flex:1}
+
+  /* splash */
+  #s-splash{justify-content:center;gap:40px;text-align:center}
+  .bigLogo svg{width:260px;height:260px}
+  .bigLogo .word{font-size:120px;font-weight:700;line-height:1;margin-top:-10px;letter-spacing:-4px}
+  .steps{font-size:44px;line-height:1.35;text-align:left;border:4px solid var(--ink);border-radius:24px;padding:28px 44px;background:var(--card)}
+  .steps b{color:var(--accent);margin-right:12px}
+  .tag{color:var(--mute);font-size:26px}
+
+  /* theme */
+  #s-theme{gap:28px}
+  .topbar{display:flex;width:100%;align-items:center;justify-content:space-between}
+  .carousel{display:flex;align-items:center;gap:20px;width:100%;flex:1;min-height:0}
+  .arrow{width:84px;height:84px;border:4px solid var(--ink);border-radius:50%;background:var(--card);font-size:44px;cursor:pointer;font-family:var(--font);flex:none}
+  .arrow:active{background:var(--accent)}
+  .tcard{flex:1;height:100%;border:5px solid var(--ink);border-radius:28px;background:var(--card);padding:36px;display:flex;flex-direction:column;gap:24px;align-items:center;text-align:center}
+  .tcard h2{font-size:72px}
+  .tcard .fig{width:300px;height:300px}
+  .tcard ol{margin:0;padding:0;list-style:none;font-size:34px;line-height:1.5;color:#444}
+  .tcard ol b{color:var(--ink)}
+  .sw{display:flex;gap:10px}
+  .sw i{display:block;width:34px;height:34px;border-radius:50%;border:3px solid var(--ink)}
+  .dots{display:flex;gap:12px}
+  .dots i{width:16px;height:16px;border-radius:50%;border:3px solid var(--ink)}
+  .dots i.on{background:var(--ink)}
+
+  /* draw */
+  #s-draw{padding-top:36px;gap:14px}
+  .chip{border:3px solid var(--ink);border-radius:30px;padding:6px 22px;font-size:26px;background:var(--card)}
+  .timer{font-size:38px;font-weight:700;min-width:100px;text-align:center}
+  .timer.low{color:#d6232a}
+  .prompt{font-size:28px;text-align:center;color:#444;min-height:76px;line-height:1.25}
+  .prompt b{color:var(--ink)}
+  .padwrap{position:relative;width:760px;height:500px;background:#fff;border:4px solid var(--ink);border-radius:8px;
+    box-shadow:6px 6px 0 var(--ink);flex:none}
+  .padwrap canvas{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
+  #hintCv{pointer-events:none;opacity:.55}
+  .guide{position:absolute;left:0;right:0;border-top:3px dashed var(--accent);pointer-events:none;font-size:18px;color:var(--accent);padding:2px 10px;text-align:right}
+  .guide.bottom{bottom:56px}
+  .guide.top{top:56px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;align-items:center;width:760px;margin-top:18px}
+  .tbtn{font-family:var(--font);font-size:24px;border:3px solid var(--ink);background:var(--card);border-radius:18px;padding:10px 18px;cursor:pointer}
+  .tbtn.sel{background:var(--ink);color:#fff}
+  .tbtn:active{transform:scale(.96)}
+  .szrow{display:flex;gap:10px;align-items:center}
+  .szrow .tbtn{width:60px;height:60px;padding:0;display:flex;align-items:center;justify-content:center}
+  .szrow .tbtn i{display:block;border-radius:50%;background:currentColor}
+  .colors{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .colors button{width:56px;height:56px;border-radius:50%;border:4px solid var(--ink);cursor:pointer;padding:0}
+  .colors button.sel{outline:5px solid var(--accent);outline-offset:3px}
+
+  /* send */
+  #s-send{gap:26px}
+  .list{width:640px;display:flex;flex-direction:column;gap:18px}
+  .friend{display:flex;align-items:center;gap:22px;border:4px solid var(--ink);border-radius:22px;background:var(--card);padding:16px 26px;font-size:40px;cursor:pointer}
+  .friend .av{width:68px;height:68px;border-radius:50%;border:4px solid var(--ink);display:flex;align-items:center;justify-content:center;font-size:34px;background:#fff;flex:none}
+  .friend .nm{flex:1}
+  .friend .ord{min-width:70px;text-align:right;font-size:34px;color:var(--accent);font-weight:700}
+  .friend.sel{background:#fff3ee;box-shadow:6px 6px 0 var(--ink)}
+  .addrow{display:flex;gap:12px;width:640px}
+  .addrow input{flex:1;font-family:var(--font);font-size:32px;border:4px solid var(--ink);border-radius:18px;padding:10px 18px;background:#fff;-webkit-user-select:text;user-select:text}
+  .note{color:var(--mute);font-size:26px;text-align:center;max-width:620px}
+
+  /* pass */
+  #s-pass{gap:26px;text-align:center}
+  .notif{width:640px;border:4px solid var(--ink);border-radius:22px;background:var(--card);padding:30px;font-size:38px;line-height:1.3}
+  .notif small{display:block;color:var(--mute);font-size:24px;margin-bottom:6px}
+  .ovals{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;width:560px}
+  .ovals i{display:block;height:130px;border:4px solid var(--ink);border-radius:50%;background:var(--card)}
+  .ovals i.new{background:var(--accent);animation:pulse 1.2s infinite}
+  @keyframes pulse{50%{transform:scale(1.06)}}
+  .peek{border:4px solid var(--ink);background:#fff;border-radius:10px;overflow:hidden;width:380px}
+  .peek canvas{display:block;width:100%}
+
+  /* reveal */
+  #s-reveal{gap:20px;padding-top:36px}
+  .rev{perspective:1600px;display:flex;flex-direction:column;align-items:center;background:#fff;border:4px solid var(--ink);box-shadow:6px 6px 0 var(--ink)}
+  .rev .pn{background-repeat:no-repeat;transform-origin:top center;backface-visibility:hidden;opacity:0}
+  .rev.go .pn{animation:unfold .8s cubic-bezier(.2,.9,.3,1.1) forwards}
+  .rev.go .pn:nth-child(1){animation-delay:.1s}
+  .rev.go .pn:nth-child(2){animation-delay:.8s}
+  .rev.go .pn:nth-child(3){animation-delay:1.5s}
+  @keyframes unfold{from{transform:rotateX(-100deg);opacity:1}to{transform:rotateX(0);opacity:1}}
+  .credits{font-size:28px;color:#444;text-align:center}
+  .row{display:flex;gap:22px}
+
+  /* polish */
+  .screen.on{animation:scr .28s ease-out}
+  @keyframes scr{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+  .bigLogo svg{animation:wob 3.2s ease-in-out infinite;transform-origin:50% 90%}
+  @keyframes wob{50%{transform:rotate(-4deg)}}
+  #startBtn,#passGo{animation:pulse 1.8s infinite}
+  .guide span{position:absolute;right:8px;top:6px;font-size:17px;line-height:1.2;background:var(--paper);
+    border:2px solid var(--accent);border-radius:12px;padding:1px 12px}
+  .tbar{width:100%;height:12px;border:3px solid var(--ink);border-radius:8px;background:var(--card);overflow:hidden;flex:none}
+  .tbar i{display:block;width:100%;height:100%;background:var(--accent);transform-origin:left;transition:transform 1s linear}
+  .tbar.low i{background:#d6232a}
+  .ovals i{background-color:#fff;background-repeat:no-repeat;background-position:center;background-size:auto 94%}
+  .ovals i.new{background-color:var(--accent)}
+  canvas,.padwrap{-webkit-touch-callout:none}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 1. ONBOARDING -->
+  <section class="screen on" id="s-splash">
+    <div class="bigLogo" style="text-align:center">
+      <svg viewBox="0 0 120 120" fill="none" stroke="#1a1a1a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+        <ellipse cx="58" cy="54" rx="40" ry="42"/>
+        <circle cx="62" cy="40" r="13" fill="#fff"/><circle cx="64" cy="40" r="5" fill="#1a1a1a"/>
+        <path d="M30 60c12 8 24 4 32-8"/>
+        <path d="M76 88l30 24" /><path d="M96 98l12-4-8 12z" fill="#ff5a36"/>
+      </svg>
+      <div class="word">eQ</div>
+    </div>
+    <div class="steps">
+      <div><b>1</b>choose a theme</div>
+      <div><b>2</b>draw a shape</div>
+      <div><b>3</b>reveal &amp; post</div>
+    </div>
+    <p class="tag">draw a head · pass it on · draw the body · pass it on · legs · ta-da</p>
+    <button class="btn primary" id="startBtn">START</button>
+  </section>
+
+  <!-- 2. THEME -->
+  <section class="screen" id="s-theme">
+    <div class="topbar"><div class="logo" data-logo></div><span class="chip">choose a theme</span></div>
+    <div class="carousel">
+      <button class="arrow" id="thPrev" aria-label="previous">‹</button>
+      <div class="tcard" id="thCard"></div>
+      <button class="arrow" id="thNext" aria-label="next">›</button>
+    </div>
+    <div class="dots" id="thDots"></div>
+    <button class="btn primary" id="thGo">DRAW →</button>
+  </section>
+
+  <!-- 3. DRAW (head / body / legs) -->
+  <section class="screen" id="s-draw">
+    <div class="topbar">
+      <div class="logo" data-logo></div>
+      <span class="chip" id="drPhase">HEAD 1/3</span>
+      <span class="timer" id="drTimer">1:30</span>
+      <button class="btn small primary" id="drDone">DONE ✓</button>
+    </div>
+    <div class="tbar" id="tbar"><i id="tfill"></i></div>
+    <p class="prompt" id="drPrompt"></p>
+    <div class="padwrap" id="padwrap">
+      <canvas id="hintCv"></canvas>
+      <canvas id="drawCv"></canvas>
+      <div class="guide top" id="gTop"><span id="gTopT"></span></div>
+      <div class="guide bottom" id="gBot"><span>let lines run past here ↓</span></div>
+    </div>
+    <div class="toolbar">
+      <button class="tbtn sel" data-tool="pen">Pen</button>
+      <button class="tbtn" data-tool="brush">Brush</button>
+      <button class="tbtn" data-tool="eraser">Eraser</button>
+      <div class="szrow" id="szRow">
+        <button class="tbtn" data-size="0"><i style="width:6px;height:6px"></i></button>
+        <button class="tbtn sel" data-size="1"><i style="width:12px;height:12px"></i></button>
+        <button class="tbtn" data-size="2"><i style="width:22px;height:22px"></i></button>
+      </div>
+      <button class="tbtn" id="undoBtn">↶ Undo</button>
+      <button class="tbtn" id="redoBtn">Redo ↷</button>
+      <button class="tbtn" id="clearBtn">Clear</button>
+    </div>
+    <div class="colors" id="colors" style="margin-top:8px"></div>
+  </section>
+
+  <!-- 4. SEND -->
+  <section class="screen" id="s-send">
+    <div class="topbar"><div class="logo" data-logo></div><span class="chip">send to</span></div>
+    <h2 style="font-size:54px;margin-top:10px">Who draws next?</h2>
+    <p class="note">Pick two friends in order: #1 draws the <b>body</b>, #2 draws the <b>legs</b>.</p>
+    <div class="list" id="friends"></div>
+    <div class="addrow"><input id="addName" placeholder="add a friend…" maxlength="12"><button class="btn small" id="addBtn">ADD</button></div>
+    <div class="sp"></div>
+    <button class="btn primary" id="sendBtn" disabled>SEND →</button>
+  </section>
+
+  <!-- 5. PASS THE IPAD / NOTIFICATION -->
+  <section class="screen" id="s-pass">
+    <div class="topbar"><div class="logo" data-logo></div><span class="chip" id="passChip"></span></div>
+    <div class="notif" id="passNotif"></div>
+    <div class="peek" id="passPeek"></div>
+    <div class="ovals" id="ovals"></div>
+    <p class="note" id="passNote"></p>
+    <div class="sp"></div>
+    <button class="btn primary" id="passGo">START →</button>
+  </section>
+
+  <!-- 6. REVEAL -->
+  <section class="screen" id="s-reveal">
+    <div class="logo" data-logo></div>
+    <h2 style="font-size:54px">ta-da!</h2>
+    <div class="rev" id="rev"></div>
+    <p class="credits" id="credits"></p>
+    <div class="row">
+      <button class="btn small" id="saveBtn">SAVE PNG</button>
+      <button class="btn small primary" id="againBtn">PLAY AGAIN</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+
+  /* ---------- config ---------- */
+  const ME = "Alex";                     // placeholder name for the first player
+  const W = 760, H = 500, HINT = 56;     // logical pad size + overlap strip
+  const SECONDS = 90;
+  const PARTS = ["head", "body", "legs"];
+  const THEMES = [
+    {name:"Monster", accent:"#ff5a36", pal:["#1a1a1a","#e5322d","#ff9a1f","#f2d12e","#3fae49","#2a7de1","#8e44c9","#ff6fb1"],
+      lines:["a monster head — eyes, teeth, horns","a monster body — claws, fur, spikes","monster legs — hooves, tentacles, feet"]},
+    {name:"Robot", accent:"#2a7de1", pal:["#1a1a1a","#6b7785","#2a7de1","#18b6c8","#f2d12e","#e5322d","#3fae49","#c9ced6"],
+      lines:["a robot head — antenna, dials, a screen face","a robot body — buttons, pipes, arms","robot legs — wheels, springs, treads"]},
+    {name:"Alien", accent:"#3fae49", pal:["#1a1a1a","#3fae49","#9bd94a","#8e44c9","#ff6fb1","#18b6c8","#f2d12e","#e5322d"],
+      lines:["an alien head — too many eyes, a glowing dome","an alien body — gills, extra arms, slime","alien legs — tentacles, hover jets, claws"]},
+    {name:"Pirate", accent:"#e5322d", pal:["#1a1a1a","#7b4a2a","#e5322d","#f2d12e","#2a7de1","#f4efe3","#3fae49","#c9ced6"],
+      lines:["a pirate head — hat, eye patch, beard","a pirate body — hook hand, sash, parrot","pirate legs — peg leg, boots, a barrel"]},
+    {name:"Dragon", accent:"#8e44c9", pal:["#1a1a1a","#8e44c9","#e5322d","#ff9a1f","#f2d12e","#3fae49","#18b6c8","#ff6fb1"],
+      lines:["a dragon head — horns, nostrils, a flame","a dragon body — wings, scales, a belly","dragon legs — talons and a spiky tail"]},
+  ];
+  const state = {theme:0, friends:["Joe","Sam","Peter","Alan"], picks:[], players:[], phase:0, segs:[null,null,null], past:[]};
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  /* ---------- stage scaling ---------- */
+  const stage = $("#stage");
+  function fit(){
+    const k = Math.min(innerWidth/834, innerHeight/1194);
+    stage.style.transform = `translate(-50%,-50%) scale(${k})`;
+  }
+  addEventListener("resize", fit); fit();
+
+  /* ---------- helpers ---------- */
+  const LOGO = `<svg viewBox="0 0 120 120" fill="none" stroke="#1a1a1a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="58" cy="54" rx="40" ry="42"/><circle cx="62" cy="40" r="12" fill="#fff"/><circle cx="64" cy="40" r="4" fill="#1a1a1a"/><path d="M76 88l30 24"/></svg><span>eQ</span>`;
+  $$("[data-logo]").forEach(e => e.innerHTML = LOGO);
+  const go = id => { $$(".screen").forEach(s => s.classList.toggle("on", s.id === id)); };
+  const theme = () => THEMES[state.theme];
+  const setAccent = () => document.documentElement.style.setProperty("--accent", theme().accent);
+
+  /* ---------- 1. onboarding ---------- */
+  $("#startBtn").onclick = () => { renderTheme(); go("s-theme"); };
+
+  /* ---------- 2. theme carousel ---------- */
+  function monsterFig(c){
+    return `<svg class="fig" viewBox="0 0 120 120" fill="none" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 70c-4-34 20-50 40-50s44 16 38 50c-2 14-12 28-38 28S24 84 22 70z" fill="${c}"/>
+      <circle cx="62" cy="52" r="15" fill="#fff"/><circle cx="64" cy="52" r="6" fill="#1a1a1a"/>
+      <path d="M36 78l8 8 8-8 8 8 8-8 8 8 8-8" fill="#fff"/></svg>`;
+  }
+  const SV = b => `<svg class="fig" viewBox="0 0 120 120" fill="none" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">${b}</svg>`;
+  function themeFig(n, c){
+    if (n === "Robot") return SV(`<path d="M60 10v14"/><circle cx="60" cy="8" r="4" fill="${c}"/><rect x="24" y="24" width="72" height="66" rx="12" fill="${c}"/><rect x="38" y="42" width="16" height="16" fill="#fff"/><rect x="66" y="42" width="16" height="16" fill="#fff"/><path d="M40 76h40M48 70v12M60 70v12M72 70v12"/><path d="M14 52v22M106 52v22"/>`);
+    if (n === "Alien") return SV(`<path d="M18 52C18 22 38 10 60 10s42 12 42 42c0 28-20 54-42 54S18 80 18 52z" fill="${c}"/><path d="M30 50c10-6 22-2 26 10-12 4-24 0-26-10zM90 50c-10-6-22-2-26 10 12 4 24 0 26-10z" fill="#1a1a1a"/><path d="M54 84h12"/><path d="M44 12L36 2M76 12l8-10"/>`);
+    if (n === "Pirate") return SV(`<circle cx="60" cy="72" r="34" fill="#f7d9b5"/><path d="M22 50c0-30 76-30 76 0z" fill="${c}"/><path d="M12 50h96"/><circle cx="76" cy="68" r="8" fill="#1a1a1a"/><circle cx="46" cy="68" r="5" fill="#fff"/><path d="M42 90c12 8 24 8 36 0"/><path d="M68 62L98 44"/>`);
+    if (n === "Dragon") return SV(`<path d="M30 36L22 8l22 16M90 36l8-28-22 16" fill="#fff"/><path d="M20 70c-6-30 14-46 40-46s46 16 40 46c-4 20-20 30-40 30S24 90 20 70z" fill="${c}"/><circle cx="44" cy="56" r="7" fill="#fff"/><circle cx="76" cy="56" r="7" fill="#fff"/><circle cx="45" cy="57" r="3" fill="#1a1a1a"/><circle cx="75" cy="57" r="3" fill="#1a1a1a"/><circle cx="52" cy="82" r="3" fill="#1a1a1a"/><circle cx="68" cy="82" r="3" fill="#1a1a1a"/>`);
+    return monsterFig(c);
+  }
+  function renderTheme(){
+    const t = theme(); setAccent();
+    $("#thCard").innerHTML = `${themeFig(t.name, t.accent)}<h2>${t.name}</h2>
+      <ol>${PARTS.map((p,i)=>`<li><b>${p}</b> · ${t.lines[i].replace(/^an? |^\w+ /,"")}</li>`).join("")}</ol>
+      <div class="sw">${t.pal.map(c=>`<i style="background:${c}"></i>`).join("")}</div>`;
+    $("#thDots").innerHTML = THEMES.map((_,i)=>`<i class="${i===state.theme?"on":""}"></i>`).join("");
+  }
+  $("#thPrev").onclick = () => { state.theme = (state.theme + THEMES.length - 1) % THEMES.length; renderTheme(); };
+  $("#thNext").onclick = () => { state.theme = (state.theme + 1) % THEMES.length; renderTheme(); };
+  $("#thGo").onclick = () => { state.phase = 0; state.segs = [null,null,null]; state.players = [ME]; startDraw(); };
+
+  /* ---------- 3. drawing ---------- */
+  const cv = $("#drawCv"), hcv = $("#hintCv"), ctx = cv.getContext("2d"), hctx = hcv.getContext("2d");
+  const tool = {name:"pen", size:1, color:"#1a1a1a"};
+  const WIDTH = {pen:[2,4,8], brush:[10,20,36], eraser:[14,30,60]};
+  let strokes = [], redo = [], cur = null, timer = null, left = SECONDS, penSeen = 0;
+
+  function sizeCanvases(){
+    [cv, hcv].forEach(c => { c.width = W*dpr; c.height = H*dpr; c.getContext("2d").setTransform(dpr,0,0,dpr,0,0); });
+  }
+  function strokeWidth(s){ return WIDTH[s.tool][s.size]; }
+  function drawStroke(g, s){
+    g.save();
+    g.globalCompositeOperation = s.tool === "eraser" ? "destination-out" : "source-over";
+    g.strokeStyle = g.fillStyle = s.color; g.lineWidth = strokeWidth(s);
+    g.lineCap = g.lineJoin = "round";
+    const p = s.pts;
+    if (s.pr && p.length > 1 && s.tool !== "eraser"){      // Apple Pencil: pressure-sensitive width
+      for (let i = 1; i < p.length; i++){
+        g.lineWidth = strokeWidth(s) * (0.35 + 1.1 * ((p[i-1].p + p[i].p) / 2));
+        g.beginPath(); g.moveTo(p[i-1].x, p[i-1].y); g.lineTo(p[i].x, p[i].y); g.stroke();
+      }
+      g.restore(); return;
+    }
+    if (p.length === 1){ g.beginPath(); g.arc(p[0].x, p[0].y, g.lineWidth/2, 0, 7); g.fill(); }
+    else {
+      g.beginPath(); g.moveTo(p[0].x, p[0].y);
+      for (let i = 1; i < p.length - 1; i++){
+        const mx = (p[i].x + p[i+1].x)/2, my = (p[i].y + p[i+1].y)/2;
+        g.quadraticCurveTo(p[i].x, p[i].y, mx, my);
+      }
+      g.lineTo(p[p.length-1].x, p[p.length-1].y); g.stroke();
+    }
+    g.restore();
+  }
+  function redraw(){ ctx.clearRect(0,0,W,H); strokes.forEach(s => drawStroke(ctx, s)); }
+  function pt(e){
+    const r = cv.getBoundingClientRect();
+    return {x:(e.clientX - r.left) * W / r.width, y:(e.clientY - r.top) * H / r.height, p:e.pressure || 0.5};
+  }
+  cv.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    if (e.pointerType === "pen") penSeen = Date.now();
+    else if (e.pointerType === "touch" && Date.now() - penSeen < 4000) return;   // palm rejection
+    cv.setPointerCapture(e.pointerId);
+    cur = {tool:tool.name, size:tool.size, color:tool.color, pr:e.pointerType === "pen", pts:[pt(e)]};
+    strokes.push(cur); redo = []; redraw();
+  });
+  cv.addEventListener("pointermove", e => {
+    if (!cur) return; e.preventDefault();
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+    (evs.length ? evs : [e]).forEach(ev => cur.pts.push(pt(ev)));
+    redraw();
+  });
+  const end = () => { cur = null; };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  cv.addEventListener("contextmenu", e => e.preventDefault());
+
+  function buildColors(){
+    $("#colors").innerHTML = theme().pal.map((c,i)=>`<button data-c="${c}" style="background:${c}" class="${i===0?"sel":""}" aria-label="${c}"></button>`).join("");
+    tool.color = theme().pal[0];
+  }
+  $("#colors").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    tool.color = b.dataset.c; $$("#colors button").forEach(x => x.classList.toggle("sel", x === b));
+    if (tool.name === "eraser") selectTool("pen");
+  };
+  function selectTool(n){ tool.name = n; $$("[data-tool]").forEach(b => b.classList.toggle("sel", b.dataset.tool === n)); }
+  $$("[data-tool]").forEach(b => b.onclick = () => selectTool(b.dataset.tool));
+  $$("[data-size]").forEach(b => b.onclick = () => { tool.size = +b.dataset.size; $$("[data-size]").forEach(x => x.classList.toggle("sel", x === b)); });
+  const undo = () => { if (strokes.length) { redo.push(strokes.pop()); redraw(); } };
+  const redoFn = () => { if (redo.length) { strokes.push(redo.pop()); redraw(); } };
+  $("#undoBtn").onclick = undo;
+  $("#redoBtn").onclick = redoFn;
+  $("#clearBtn").onclick = () => { strokes = []; redo = []; redraw(); };
+  addEventListener("keydown", e => {
+    if (!$("#s-draw").classList.contains("on") || !(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+    e.preventDefault(); e.shiftKey ? redoFn() : undo();
+  });
+
+  function startDraw(){
+    const ph = state.phase, t = theme();
+    setAccent(); sizeCanvases(); buildColors(); strokes = []; redo = []; cur = null; selectTool("pen");
+    $("#drPhase").textContent = `${PARTS[ph].toUpperCase()} ${ph+1}/3`;
+    $("#drPrompt").innerHTML = `<b>${state.players[ph]}</b>, draw ${t.lines[ph]}.` +
+      (ph < 2 ? `<br>Let some lines run to the dashed edge so the next player can continue.` : `<br>Finish the creature — this is the last piece.`);
+    $("#gTop").style.display = ph > 0 ? "block" : "none";
+    if (ph > 0) $("#gTopT").textContent = `↑ ${state.players[ph-1]}'s lines — carry them on`;
+    $("#gBot").style.display = ph < 2 ? "block" : "none";
+    hctx.clearRect(0,0,W,H);
+    if (ph > 0){   // carry-over strip: bottom of previous segment, shown faded at the top
+      hctx.drawImage(state.segs[ph-1], 0, (H-HINT)*dpr, W*dpr, HINT*dpr, 0, 0, W, HINT);
+    }
+    left = SECONDS; tick(); clearInterval(timer);
+    timer = setInterval(() => { left--; tick(); if (left <= 0) finishDraw(); }, 1000);
+    go("s-draw");
+  }
+  function tick(){
+    const el = $("#drTimer"); el.textContent = `${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}`;
+    el.classList.toggle("low", left <= 10);
+    $("#tbar").classList.toggle("low", left <= 10);
+    $("#tfill").style.transform = `scaleX(${Math.max(0, left / SECONDS)})`;
+  }
+  function finishDraw(){
+    clearInterval(timer);
+    const copy = document.createElement("canvas"); copy.width = cv.width; copy.height = cv.height;
+    copy.getContext("2d").drawImage(cv, 0, 0);
+    state.segs[state.phase] = copy;
+    if (state.phase === 2){ renderReveal(); return; }
+    renderSend();
+  }
+  $("#drDone").onclick = finishDraw;
+
+  /* ---------- 4. send ---------- */
+  function renderSend(){
+    if (state.phase === 0){
+      state.picks = []; drawFriends(); go("s-send");
+    } else {          // later turns: the chain is already decided, hand over directly
+      nextPlayer();
+    }
+  }
+  function drawFriends(){
+    $("#friends").innerHTML = state.friends.map(n => {
+      const i = state.picks.indexOf(n);
+      return `<div class="friend ${i>=0?"sel":""}" data-n="${n}"><div class="av">${n[0]}</div><div class="nm">${n}</div><div class="ord">${i>=0?"#"+(i+1):""}</div></div>`;
+    }).join("");
+    $("#sendBtn").disabled = state.picks.length !== 2;
+  }
+  $("#friends").onclick = e => {
+    const f = e.target.closest(".friend"); if (!f) return;
+    const n = f.dataset.n, i = state.picks.indexOf(n);
+    if (i >= 0) state.picks.splice(i,1); else if (state.picks.length < 2) state.picks.push(n);
+    drawFriends();
+  };
+  function addFriend(){
+    const v = $("#addName").value.trim(); if (!v || state.friends.includes(v)) return;
+    state.friends.push(v); $("#addName").value = ""; drawFriends();
+  }
+  $("#addBtn").onclick = addFriend;
+  $("#addName").addEventListener("keydown", e => { if (e.key === "Enter") addFriend(); });
+  $("#sendBtn").onclick = () => { state.players = [ME, ...state.picks]; nextPlayer(); };
+
+  /* ---------- 5. pass the iPad ---------- */
+  function nextPlayer(){
+    state.phase++;
+    const ph = state.phase, who = state.players[ph], from = state.players[ph-1];
+    $("#passChip").textContent = `pass the iPad`;
+    $("#passNotif").innerHTML = `<small>new eQ for ${who}</small><b>${from}</b> sent you a eQ — draw the <b>${PARTS[ph]}</b>`;
+    const strip = document.createElement("canvas"); strip.width = W; strip.height = HINT*2;
+    strip.getContext("2d").drawImage(state.segs[ph-1], 0, (H-HINT*2)*dpr, W*dpr, HINT*2*dpr, 0, 0, W, HINT*2);
+    $("#passPeek").innerHTML = ""; $("#passPeek").appendChild(strip);
+    $("#passNote").textContent = `${who} only sees the bottom edge — the rest stays hidden until the reveal.`;
+    $("#passGo").textContent = `${PARTS[ph].toUpperCase()} START →`;
+    $("#ovals").innerHTML = `<i class="new"></i>` + Array.from({length:5}, (_,i) =>
+      `<i${state.past[i] ? ` style="background-image:url(${state.past[i]})"` : ""}></i>`).join("");
+    go("s-pass");
+  }
+  $("#passGo").onclick = startDraw;
+
+  /* ---------- 6. reveal ---------- */
+  let finalURL = null, finalCanvas = null;
+  function renderReveal(){
+    const OFF = H - HINT, FH = H + 2*OFF;
+    finalCanvas = document.createElement("canvas"); finalCanvas.width = W*dpr; finalCanvas.height = FH*dpr;
+    const g = finalCanvas.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0,0,finalCanvas.width,finalCanvas.height);
+    state.segs.forEach((s,i) => g.drawImage(s, 0, i*OFF*dpr, W*dpr, H*dpr));
+    finalURL = finalCanvas.toDataURL("image/png");
+    state.past.unshift(finalURL); state.past.length = Math.min(state.past.length, 5);
+    const k = 0.58, hs = [OFF, OFF, H];
+    $("#rev").className = "rev";
+    $("#rev").innerHTML = hs.map((h,i)=>`<div class="pn" style="width:${W*k}px;height:${h*k}px;background-image:url(${finalURL});background-size:${W*k}px ${FH*k}px;background-position:0 -${i*OFF*k}px"></div>`).join("");
+    $("#credits").innerHTML = PARTS.map((p,i)=>`${p}: <b>${state.players[i]}</b>`).join(" · ");
+    go("s-reveal");
+    requestAnimationFrame(() => requestAnimationFrame(() => $("#rev").classList.add("go")));
+  }
+  $("#saveBtn").onclick = () => {
+    finalCanvas.toBlob(b => {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(b);
+      a.download = "eq-drawing.png"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    });
+  };
+  $("#againBtn").onclick = () => { renderTheme(); go("s-theme"); };
+
+  /* test hook */
+  window.__eq = {state, finishDraw, strokes: () => strokes};
+})();
+</script>
+</body>
+</html>
